@@ -36,20 +36,20 @@ abstract class ElasticsearchInputFormatSpec extends WordSpec with Matchers with 
       val sut = ElasticsearchDataset.fromElasticsearchQuery[DataRow](
         ExecutionEnvironment.getExecutionEnvironment,
         Index,
-        """{"fields": ["some_string","some_boolean","some_long","some_date","sub_doc.sub_doc_id"]}""",
+        """{"fields": ["some_string","some_boolean","some_long","some_date","sub_doc.sub_doc_id","some_double","some_geo_point"]}""",
         Set(es.host),
         es.httpPort
       )
 
       def build(values:Any*) = {
-        val expectedTypes = Array[java.lang.Class[_]](classOf[String], classOf[Boolean], classOf[Long], classOf[String], classOf[String]).map(TypeExtractor.getForClass(_))
-        val expectedNames = Array("some_string","some_boolean","some_long","some_date","sub_doc.sub_doc_id")
+        val expectedTypes = Array[java.lang.Class[_]](classOf[String], classOf[Boolean], classOf[Long], classOf[String], classOf[String], classOf[Double], classOf[GPSCoordinate]).map(TypeExtractor.getForClass(_))
+        val expectedNames = Array("some_string","some_boolean","some_long","some_date","sub_doc.sub_doc_id","some_double","some_geo_point")
         DataRow(values.indices.map { i => Value(values(i), expectedNames(i), expectedTypes(i)) }: _*)
       }
 
       sut.filter(_[String]("some_string") != "def").collect() should contain only(
-        build("abc", true, 12345678901L, "2016-04-25T21:54:23.321Z", "sd1"),
-        build(null, false, 98765432109L, null, "sd2")
+        build("abc", true, 12345678901L, "2016-04-25T21:54:23.321Z", "sd1", 23.7, null),
+        build(null, false, 98765432109L, null, "sd2", 0.0, GPSCoordinate(89,178))
       )
     }
     "fetch a DataSet from Elasticsearch to a data row and perform fancy logic" in {
@@ -121,6 +121,8 @@ abstract class ElasticsearchInputFormatSpec extends WordSpec with Matchers with 
          |    "properties": {
          |      "some_string": {"type": "string", "index": "not_analyzed"},
          |      "some_boolean": {"type": "boolean"},
+         |      "some_double": {"type": "double"},
+         |      "some_geo_point": {"type": "geo_point"},
          |      "some_long": {"type": "long"},
          |      "some_date": {"type": "date", "format": "date_time"},
          |      "sub_doc":{
@@ -142,19 +144,19 @@ abstract class ElasticsearchInputFormatSpec extends WordSpec with Matchers with 
       esClient.index(
         Index,
         DocType,
-        """{"some_string": "abc", "some_boolean": "true", "some_long": 12345678901, "some_date": "2016-04-25T21:54:23.321Z", "sub_doc": {"sub_doc_id": "sd1"}}"""
+        """{"some_string": "abc", "some_boolean": "true", "some_double": 23.7, "some_long": 12345678901, "some_date": "2016-04-25T21:54:23.321Z", "sub_doc": {"sub_doc_id": "sd1"}}"""
       )
 
       esClient.index(
         Index,
         DocType,
-        """{"some_string": "def", "some_boolean": "true", "some_long": 10, "some_date": "2015-04-25T21:54:23.321Z", "sub_doc": {"sub_doc_id": "sd1"}}"""
+        """{"some_string": "def", "some_boolean": "true", "some_double": 1.0, "some_long": 10, "some_date": "2015-04-25T21:54:23.321Z", "sub_doc": {"sub_doc_id": "sd1"}}"""
       )
 
       esClient.index(
         Index,
         DocType,
-        """{"some_string": null, "some_boolean": "false", "some_long": 98765432109, "sub_doc": {"sub_doc_id": "sd2"}}"""
+        """{"some_string": null, "some_boolean": "false", "some_double": 0.0, "some_long": 98765432109, "sub_doc": {"sub_doc_id": "sd2"}, "some_geo_point":[178,89]}"""
       )
 
       esClient.flush(Index)

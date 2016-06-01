@@ -317,7 +317,7 @@ class ElasticseachInputFormat[T](nodes: Set[String],
         require(valueParsers.contains(cl), s"Read a ${cl.getCanonicalName} value from a Elasticsearch hit is not supported. Supported types are: $supportedTypes.")
         val value =
           if (fieldValues.has(fieldName))
-            fieldValues.get(fieldName).asInstanceOf[ArrayNode].get(0)
+            fieldValues.get(fieldName).asInstanceOf[ArrayNode]
           else
             null
 
@@ -331,22 +331,23 @@ class ElasticseachInputFormat[T](nodes: Set[String],
   }
 
   // Note: for datetime, the client will have to get as a String, and do the parsing herself.
-  private val valueParsers = Map[Class[_], JsonNode => AnyRef](
-    (classOf[String], _.asText()),
-    (classOf[Byte], n => new java.lang.Byte(n.asInt().toByte)),
-    (classOf[Int], n => new java.lang.Integer(n.asInt())),
-    (classOf[Long], n => new java.lang.Long(n.asLong())),
-    (classOf[Float], n => new java.lang.Float(n.asDouble())),
-    (classOf[Double], n => new java.lang.Double(n.asDouble())),
-    (classOf[Boolean], n => new java.lang.Boolean(n.asBoolean())),
-    (classOf[Array[Double]], n => n.asInstanceOf[ArrayNode].elements().asScala.map(_.asDouble()).toArray),
-    (classOf[java.lang.Byte], n => new java.lang.Byte(n.asInt().toByte)),
-    (classOf[java.lang.Integer], n => new java.lang.Integer(n.asInt())),
-    (classOf[java.lang.Long], n => new java.lang.Long(n.asLong())),
-    (classOf[java.lang.Float], n => new java.lang.Float(n.asDouble())),
-    (classOf[java.lang.Double], n => new java.lang.Double(n.asDouble())),
-    (classOf[java.lang.Boolean], n => new java.lang.Boolean(n.asBoolean())),
-    (classOf[Array[java.lang.Double]], n => n.asInstanceOf[ArrayNode].elements().asScala.map(_.asDouble()).toArray)
+  private val valueParsers = Map[Class[_], ArrayNode => AnyRef](
+    (classOf[String], _.get(0).asText()),
+    (classOf[Byte], n => new java.lang.Byte(n.get(0).asInt().toByte)),
+    (classOf[Int], n => new java.lang.Integer(n.get(0).asInt())),
+    (classOf[Long], n => new java.lang.Long(n.get(0).asLong())),
+    (classOf[Float], n => new java.lang.Float(n.get(0).asDouble())),
+    (classOf[Double], n => new java.lang.Double(n.get(0).asDouble())),
+    (classOf[Boolean], n => new java.lang.Boolean(n.get(0).asBoolean())),
+    (classOf[Array[Double]], n => n.elements().asScala.map(_.asDouble()).toArray),
+    (classOf[java.lang.Byte], n => new java.lang.Byte(n.get(0).asInt().toByte)),
+    (classOf[java.lang.Integer], n => new java.lang.Integer(n.get(0).asInt())),
+    (classOf[java.lang.Long], n => new java.lang.Long(n.get(0).asLong())),
+    (classOf[java.lang.Float], n => new java.lang.Float(n.get(0).asDouble())),
+    (classOf[java.lang.Double], n => new java.lang.Double(n.get(0).asDouble())),
+    (classOf[java.lang.Boolean], n => new java.lang.Boolean(n.get(0).asBoolean())),
+    (classOf[Array[java.lang.Double]], n => n.elements().asScala.map(_.asDouble()).toArray),
+    (classOf[GPSCoordinate],n => new GPSCoordinate(n.get(1).asDouble(),n.get(0).asDouble()))
   )
 
   private val esSimpleMappings = Map[String, Option[Class[_]]](
@@ -362,9 +363,14 @@ class ElasticseachInputFormat[T](nodes: Set[String],
     "short" -> Some(classOf[java.lang.Integer]),
     "byte" -> Some(classOf[java.lang.Byte]),
     "binary" -> None, // Not supported
-    "geo_point" -> Some(classOf[Array[java.lang.Double]]),
+    "geo_point" -> Some(classOf[GPSCoordinate]),
     "geo_shape" -> None // Not supported
   ).withDefaultValue(None)
 
   private val supportedTypes = valueParsers.keys.map(_.getCanonicalName).mkString(", ")
+}
+
+case class GPSCoordinate(latitude: Double = .0, longitude: Double = .0){
+    require(-90 <= latitude && latitude <= 90, "a latitude is between -90 and 90")
+    require(-180 <= longitude && longitude <= 180, "a longitude is between -180 and 180")
 }
